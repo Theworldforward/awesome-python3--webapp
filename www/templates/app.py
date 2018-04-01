@@ -36,3 +36,32 @@ def create_pool(loop,**kw):
         minsize=kw.get('minsize', 1),
         loop=loop
         )
+#select statements
+@asyncio.coroutine
+def select(sql, args, size=None):
+    log(sql, args)
+    global __pool
+    with (yield from __pool) as conn:
+        cur = yield from conn.cursor(aiomysql.DictCursor)
+        yield from cur.execute(sql.replace('?','%s'), args or ())
+        if size:
+            rs = yield from cur.fetchmany(size)
+        else:
+            rs = yield from cur.fetchall()
+        yield from cur.close()
+        logging.info('rows returned: %s' % len(rs))
+        return rs
+
+#Insert,Update,Delete,SQL statements
+@asyncio.coroutine
+def execute(sql, args):
+    log(sql)
+    with (yield from __pool) as conn:
+        try:
+            cur = yield from conn.cursor()
+            yield from cur.execute(sql.replace('?', '%s'),args)
+            affected = cur.rowcount
+            yield from cur.close()
+        except BaseExcption as e:
+            raise
+        return affected
